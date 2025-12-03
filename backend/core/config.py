@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, AnyUrl, computed_field
+from pydantic import PostgresDsn, AnyUrl
 from pydantic_settings import BaseSettings
 
 
@@ -55,12 +55,6 @@ class Settings(BaseSettings):
                 port=self.POSTGRES_PORT,
                 path=self.POSTGRES_DB,
             )
-
-    @computed_field
-    @property
-    def USE_UUID(self) -> bool:
-        """Автоматически включает UUID для PostgreSQL."""
-        return self.DATABASE_TYPE == "postgres"
 
 
 @lru_cache(maxsize=1)

@@ -2,34 +2,21 @@
 
 import uuid
 from datetime import datetime
-from typing import Union
 
-from sqlalchemy import DateTime, Integer, Uuid
+from sqlalchemy import DateTime, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, declared_attr
 from sqlalchemy.sql import func
 
-from core.config import settings
-
-IDType = Union[int, uuid.UUID]
-
 
 class IDMixin:
-    """Динамический первичный ключ: int для SQLite, UUID для PostgreSQL."""
+    """первичный ключ."""
 
-    if settings.USE_UUID:
-        id: Mapped[uuid.UUID] = mapped_column(
-            Uuid,
-            primary_key=True,
-            default=uuid.uuid4,
-            index=True,
-        )
-    else:
-        id: Mapped[int] = mapped_column(
-            Integer,
-            primary_key=True,
-            index=True,
-            autoincrement=True,
-        )
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+    )
 
 
 class TimestampMixin:

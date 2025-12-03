@@ -1,18 +1,15 @@
 """Миксины для Pydantic-схем с общими полями (id, временные метки, активность)."""
 
 from datetime import datetime
+from uuid import UUID
 
-from core.config import settings
 from pydantic import BaseModel, ConfigDict
 
 
 class IDMixin(BaseModel):
     """Миксин: id."""
 
-    if settings.USE_UUID:
-        id: str
-    else:
-        id: int
+    id: UUID
 
 
 class TimestampMixin(BaseModel):
