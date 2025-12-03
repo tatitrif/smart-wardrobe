@@ -1,10 +1,13 @@
 """Конфигурация приложения через Pydantic Settings."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import PostgresDsn, AnyUrl
 from pydantic_settings import BaseSettings
+
+BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
 
 class Settings(BaseSettings):
@@ -40,6 +43,16 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "postgres_db"
+
+    # Настройки загрузки файлов
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB в байтах
+    ALLOWED_IMAGE_TYPES: list[str] = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+    ]
 
     @property
     def DATABASE_URL(self) -> AnyUrl:

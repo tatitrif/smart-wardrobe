@@ -1,8 +1,8 @@
 """Модель sqlalchemy для Item (предметы гардероба)."""
 
-
-from sqlalchemy import String, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+import uuid
+from sqlalchemy import String, JSON, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import DeclarativeBaseModel
 
@@ -37,4 +37,17 @@ class Item(DeclarativeBaseModel):
     is_favorite: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None] = mapped_column(String(1000))
 
+    images: Mapped[list["ItemImage"]] = relationship(
+        back_populates="item", cascade="all, delete-orphan"
+    )
 
+
+class ItemImage(DeclarativeBaseModel):
+    """Модель изображений предмета гардероба."""
+
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("item.id"))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    is_primary: Mapped[bool] = mapped_column(default=False)
+    angle: Mapped[str | None] = mapped_column(String(20))
+
+    item: Mapped["Item"] = relationship(back_populates="images")
