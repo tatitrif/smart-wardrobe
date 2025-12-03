@@ -40,6 +40,11 @@ class ItemImageCRUD(CRUDBase[ItemImage, ItemImageCreate, ItemImageUpdate, IDType
         self, db: AsyncSession, item_id: IDType, image_id: IDType
     ) -> bool:
         """Сделать изображение основным."""
+        # Проверяем существование изображения и принадлежность к предмету
+        obj = await self.get(db, image_id)
+        if not obj or obj.item_id != item_id:
+            return False
+
         # Снимаем is_primary со всех изображений предмета
         await db.execute(
             update(self.model)
@@ -47,13 +52,11 @@ class ItemImageCRUD(CRUDBase[ItemImage, ItemImageCreate, ItemImageUpdate, IDType
             .values(is_primary=False)
         )
         # Устанавливаем для указанного
-        obj = await self.get(db, image_id)
-        if obj and obj.item_id == item_id:
-            obj.is_primary = True
-            await db.commit()
-            await db.refresh(obj)
-            return True
-        return False
+        obj.is_primary = True
+        db.add(obj)
+        await db.commit()
+        await db.refresh(obj)
+        return True
 
 
 # Создаём экземпляр CRUD-класса для ItemImage

@@ -17,6 +17,13 @@ from core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Magic bytes для проверки реального формата файла
+IMAGE_MAGIC_BYTES = {
+    b"\xff\xd8\xff": "image/jpeg",  # JPEG
+    b"\x89\x50\x4e\x47": "image/png",  # PNG
+    b"RIFF": "image/webp",  # WebP (нужна дополнительная проверка)
+}
+
 
 async def handle_file_upload(
     file: UploadFile,
@@ -45,7 +52,7 @@ async def handle_file_upload(
     if max_size is None:
         max_size = settings.MAX_FILE_SIZE
 
-    # Проверка типа файла
+    # Проверка типа файла по content_type
     if not file.content_type or file.content_type not in supported_types:
         logger.warning(
             f"Попытка загрузки файла с недопустимым типом: {file.content_type}"
@@ -54,6 +61,51 @@ async def handle_file_upload(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Недопустимый тип файла. Разрешены: {', '.join(supported_types)}",
         )
+
+    # Проверка реального формата файла через magic bytes (опционально, для безопасности)
+    # Читаем первые байты файла для проверки
+    file_content_start = b""
+    try:
+        chunk = await file.read(12)
+        file_content_start = chunk
+        # Возвращаемся в начало файла (если поддерживается)
+        try:
+            await file.seek(0)
+        except (AttributeError, OSError):
+            # Если seek не поддерживается, пропускаем проверку magic bytes
+            # и используем только content_type
+            file_content_start = b""
+            logger.debug("Seek не поддерживается, пропускаем проверку magic bytes")
+
+        if file_content_start:
+            # Проверяем magic bytes
+            detected_type = None
+            for magic_bytes, mime_type in IMAGE_MAGIC_BYTES.items():
+                if file_content_start.startswith(magic_bytes):
+                    detected_type = mime_type
+                    break
+
+            # Для WebP нужна дополнительная проверка
+            if file_content_start.startswith(b"RIFF") and b"WEBP" in file_content_start:
+                detected_type = "image/webp"
+
+            # Если определен тип и он не совпадает с заявленным - предупреждение
+            if detected_type and detected_type != file.content_type:
+                logger.warning(
+                    f"Несоответствие типа файла: заявлен {file.content_type}, "
+                    f"определен {detected_type}"
+                )
+                # Для безопасности отклоняем несоответствие
+                if detected_type not in supported_types:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Файл не является допустимым изображением",
+                    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Если не удалось прочитать файл, продолжаем с проверкой content_type
+        logger.warning(f"Не удалось проверить magic bytes файла: {e}")
 
     # Определение расширения файла
     _, ext = os.path.splitext(file.filename or "")
@@ -115,3 +167,31 @@ async def handle_file_upload(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при загрузке файла",
         ) from e
+
+
+async def delete_uploaded_file(file_name: str, dir_location: str | None = None) -> bool:
+    """Удаляет загруженный файл.
+
+    Args:
+        file_name: Имя файла для удаления
+        dir_location: Директория с файлом (по умолчанию из настроек)
+
+    Returns:
+        True если файл был удален, False если файл не найден
+    """
+    if dir_location is None:
+        dir_location = settings.UPLOAD_DIR
+
+    file_path = Path(BASE_DIR) / dir_location / file_name
+
+    try:
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"Файл успешно удален: {file_name}")
+            return True
+        else:
+            logger.warning(f"Файл не найден для удаления: {file_name}")
+            return False
+    except OSError as e:
+        logger.error(f"Ошибка при удалении файла {file_name}: {e}")
+        return False

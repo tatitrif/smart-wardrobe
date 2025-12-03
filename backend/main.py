@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api import routers
-from core.config import settings
+from core.config import BASE_DIR, settings
 from core.db import db_manager
 from core.middleware import LoggingMiddleware
 
@@ -37,6 +38,15 @@ def get_app() -> FastAPI:
     )
     _app.add_middleware(LoggingMiddleware)
     _app.include_router(routers.v1_router, prefix="/api")
+
+    # Статическая раздача загруженных файлов
+    uploads_path = BASE_DIR / settings.UPLOAD_DIR
+    uploads_path.mkdir(parents=True, exist_ok=True)
+    _app.mount(
+        "/uploads",
+        StaticFiles(directory=str(uploads_path)),
+        name="uploads",
+    )
 
     return _app
 
