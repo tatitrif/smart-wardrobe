@@ -3,7 +3,8 @@
 from core.db import get_db
 from crud.item import item_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from schemas.item import ItemCreate, ItemRead, ItemUpdate, ItemListResponse
+from schemas.types import IDType
+from schemas.item import ItemCreate, ItemResponse, ItemUpdate, ItemListResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/items", tags=["items"])
@@ -11,27 +12,28 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 @router.post(
     "/",
-    response_model=ItemRead,
+    response_model=ItemResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создать новый предмет гардероба",
 )
 async def create_item(
-    item_in: ItemCreate,
+    item_data: ItemCreate,
     db: AsyncSession = Depends(get_db),
-) -> ItemRead:
+) -> ItemResponse:
     """Создаёт новый предмет гардероба."""
-    return await item_crud.create(db, obj_in=item_in)
+    item = await item_crud.create(db, obj_in=item_data)
+    return ItemResponse.model_validate(item, from_attributes=True)
 
 
 @router.get(
     "/{item_id}",
-    response_model=ItemRead,
+    response_model=ItemResponse,
     summary="Получить предмет гардероба по ID",
 )
 async def read_item(
-    item_id: int,
+    item_id: IDType,
     db: AsyncSession = Depends(get_db),
-) -> ItemRead:
+) -> ItemResponse:
     """Возвращает предмет гардероба по его ID."""
     item = await item_crud.get(db, id=item_id)
     if not item:
@@ -39,7 +41,7 @@ async def read_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Item not found",
         )
-    return item
+    return ItemResponse.model_validate(item, from_attributes=True)
 
 
 @router.get(
@@ -68,14 +70,14 @@ async def read_items(
 
 @router.patch(
     "/{item_id}",
-    response_model=ItemRead,
+    response_model=ItemResponse,
     summary="Частично обновить предмет гардероба",
 )
 async def update_item(
-    item_id: int,
-    item_in: ItemUpdate,
+    item_id: IDType,
+    item_data: ItemUpdate,
     db: AsyncSession = Depends(get_db),
-) -> ItemRead:
+) -> ItemResponse:
     """Обновляет по ID те поля, которые нужно изменить."""
     db_item = await item_crud.get(db, id=item_id)
     if not db_item:
@@ -83,7 +85,8 @@ async def update_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Item not found",
         )
-    return await item_crud.update(db, db_obj=db_item, obj_in=item_in)
+    item = await item_crud.update(db, db_obj=db_item, obj_in=item_data)
+    return ItemResponse.model_validate(item, from_attributes=True)
 
 
 @router.delete(
@@ -92,7 +95,7 @@ async def update_item(
     summary="Удалить предмет гардероба",
 )
 async def delete_item(
-    item_id: int,
+    item_id: IDType,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Удаляет предмет гардероба (soft-delete)."""

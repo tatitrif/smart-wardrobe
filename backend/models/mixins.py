@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 
 
 class IDMixin:
-    """первичный ключ."""
+    """Первичный ключ UUID."""
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -46,12 +46,11 @@ class IsActiveMixin:
 
 
 class TableNameMixin:
-    """Автоматически задаёт имя таблицы."""
+    """Автоматически задаёт имя таблицы в snake_case."""
 
     @declared_attr
     def __tablename__(cls) -> str:
         """Генерация имени таблицы на основе имени класса."""
-        # e.g. SomeModelName -> some_model_name
         return re.sub(r"(?<!^)(?=[A-Z])", "_", cls.__name__).lower()
 
 

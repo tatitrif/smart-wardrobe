@@ -1,15 +1,16 @@
 """Миксины для Pydantic-схем с общими полями (id, временные метки, активность)."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
+
+from .types import IDType
 
 
 class IDMixin(BaseModel):
     """Миксин: id."""
 
-    id: UUID
+    id: IDType
 
 
 class TimestampMixin(BaseModel):
@@ -20,12 +21,12 @@ class TimestampMixin(BaseModel):
 
 
 class IsActiveMixin(BaseModel):
-    """Миксин: флаг активности (для soft-delete)."""
+    """Миксин: флаг активности (soft-delete)."""
 
-    is_active: bool = True
+    is_active: bool
 
 
-class BaseReadMixin(IDMixin, TimestampMixin, IsActiveMixin):
+class BaseReadMixin(TimestampMixin, IsActiveMixin, IDMixin):
     """Комбинированный миксин для всех схем чтения (Read-схем)."""
 
     model_config = ConfigDict(from_attributes=True)

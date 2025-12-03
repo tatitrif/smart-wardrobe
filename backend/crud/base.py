@@ -1,6 +1,6 @@
 """Базовый асинхронный CRUD-миксин для SQLAlchemy моделей."""
 
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
@@ -9,9 +9,10 @@ from sqlalchemy.orm import DeclarativeBase
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 CreateSchemaType = TypeVar("CreateSchemaType")
 UpdateSchemaType = TypeVar("UpdateSchemaType")
+IDType = TypeVar("IDType", bound=Any)
 
 
-class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType, IDType]):
     """Универсальный асинхронный CRUD-класс для работы с SQLAlchemy моделями."""
 
     def __init__(self, model: type[ModelType]):
@@ -22,7 +23,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         self.model = model
 
-    async def get(self, db: AsyncSession, id: int | str) -> ModelType | None:
+    async def get(self, db: AsyncSession, id: IDType) -> ModelType | None:
         """Получить запись по ID (только активные, если есть is_active)."""
         stmt = select(self.model).where(self.model.id == id)
         # Поддержка soft-delete через миксин IsActiveMixin
@@ -74,7 +75,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await db.refresh(db_obj)
         return db_obj
 
-    async def remove(self, db: AsyncSession, *, id: int | str) -> bool:
+    async def remove(self, db: AsyncSession, *, id: IDType) -> bool:
         """Удалить запись (soft-delete, если поддерживается)."""
         obj = await self.get(db, id)
         if not obj:
