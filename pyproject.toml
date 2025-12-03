@@ -1,0 +1,10 @@
+[project]
+name = "smart-wardrope"
+version = "0.1.0"
+description = "Проект 'Умный гардероб'"
+readme = "README.md"
+requires-python = ">=3.12"
+ [tool.uv.workspace]
+members = [
+    "backend",
+]
