@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+import re
 
 from sqlalchemy import DateTime, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, declared_attr
@@ -48,8 +49,10 @@ class TableNameMixin:
     """Автоматически задаёт имя таблицы."""
 
     @declared_attr
-    def __tablename__(cls) -> str:  # noqa
-        return cls.__name__.lower()
+    def __tablename__(cls) -> str:
+        """Генерация имени таблицы на основе имени класса."""
+        # e.g. SomeModelName -> some_model_name
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", cls.__name__).lower()
 
 
 class ReprMixin:
