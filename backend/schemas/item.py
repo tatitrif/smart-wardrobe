@@ -13,18 +13,24 @@ class ItemBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     brand: str | None = Field(None, max_length=50)
     category: str | None = Field(None, max_length=50)
-    material: str | None = Field(max_length=50, description="Материал (хлопок, шерсть)")
-    pattern: str | None = Field(max_length=50, description="Тип узора: solid, stripe,")
-    dominant_color: HexColorStr | None = Field(description="HEX-цвет")
-    color_palette: list[HexColorStr] | None = Field(description="Список HEX-цветов")
+    material: str | None = Field(
+        None, max_length=50, description="Материал (хлопок, шерсть)"
+    )
+    pattern: str | None = Field(
+        None, max_length=50, description="Тип узора: solid, stripe,"
+    )
+    dominant_color: HexColorStr | None = Field(None, description="HEX-цвет")
+    color_palette: list[HexColorStr] | None = Field(
+        None, description="Список HEX-цветов"
+    )
     season: list[str] | None = Field(
-        description="Сезонность: spring, summer, autumn, winter"
+        None, description="Сезонность: spring, summer, autumn, winter"
     )
     occasion: list[str] | None = Field(
-        description="Повод: ['casual', 'work', 'party', 'sport']"
+        None, description="Повод: ['casual', 'work', 'party', 'sport']"
     )
     tags: list[str] | None = Field(
-        description="Пользовательские теги: ['любимое', 'новое']"
+        None, description="Пользовательские теги: ['любимое', 'новое']"
     )
     is_favorite: bool = False
     notes: str | None = Field(None, max_length=1000)
