@@ -1,7 +1,10 @@
 """Модуль для распознавания одежды на изображениях."""
 
+import asyncio
+import json
 from pathlib import Path
 
+from core.config import settings
 from core.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -31,6 +34,7 @@ class RecognitionResult:
         self.dominant_color = dominant_color
         self.color_palette = color_palette or []
         self.season = season or []
+        self.season = season or []
         self.occasion = occasion or []
         self.confidence = confidence
 
@@ -46,9 +50,6 @@ async def recognize_clothing_from_image(
     Returns:
         RecognitionResult с распознанными данными
 
-    Note:
-        В текущей реализации используется mock-распознавание.
-        Для продакшена необходимо интегрировать реальный сервис распознавания.
     """
     image_path = Path(image_path)
 
@@ -56,9 +57,23 @@ async def recognize_clothing_from_image(
         logger.error(f"Файл изображения не найден: {image_path}")
         raise FileNotFoundError(f"Image file not found: {image_path}")
 
-    # Mock-распознавание для демонстрации
-    logger.info(f"Распознавание одежды на изображении: {image_path.name}")
-    result = await _mock_recognition(image_path)
+    service = settings.RECOGNITION_SERVICE
+    logger.info(
+        "Распознавание одежды на изображении %s (service=%s)",
+        image_path.name,
+        service,
+    )
+
+    if service == "local":
+        result = await _recognize_with_local_model(image_path)
+    elif service == "mock":
+        result = await _mock_recognition(image_path)
+    else:
+        # Пока поддерживаем только mock/local. Остальные сервисы можно добавить позже.
+        logger.warning(
+            "Неизвестный тип сервиса распознавания '%s'. Использую mock.", service
+        )
+        result = await _mock_recognition(image_path)
 
     return result
 
@@ -109,6 +124,104 @@ async def _mock_recognition(image_path: Path) -> RecognitionResult:
         season=["spring", "summer", "autumn", "winter"],  # Универсальный
         occasion=["casual"],
         confidence=0.7,  # Mock уверенность
+    )
+
+
+async def _recognize_with_local_model(image_path: Path) -> RecognitionResult:
+    """Выполняет распознавание при помощи локальной ML модели (YOLO, TensorFlow и т.п.).
+
+    Ожидается, что в настройке RECOGNITION_LOCAL_COMMAND указан шаблон команды запуска,
+    например::
+
+        RECOGNITION_LOCAL_COMMAND="python scripts/infer.py --image {image}"
+
+    Команда должна вернуть JSON следующего вида:
+    {
+        "category": "shirt",
+        "name": "Футболка",
+        "brand": "Nike",
+        "material": "cotton",
+        "pattern": "solid",
+        "dominant_color": "#FFCC00",
+        "color_palette": ["#FFCC00", "#000000"],
+        "season": ["summer"],
+        "occasion": ["sport"],
+        "confidence": 0.92
+    }
+    """
+    command_template = settings.RECOGNITION_LOCAL_COMMAND
+    if not command_template:
+        raise RuntimeError(
+            "RECOGNITION_LOCAL_COMMAND не задан. Укажите команду запуска локальной ML модели."
+        )
+
+    command = command_template.format(image=str(image_path))
+    logger.debug("Запуск локальной модели: %s", command)
+
+    process = await asyncio.create_subprocess_shell(
+        command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(), timeout=settings.RECOGNITION_LOCAL_TIMEOUT
+        )
+    except TimeoutError as exc:
+        process.kill()
+        logger.error(
+            "Локальная модель превысила таймаут (%s сек)",
+            settings.RECOGNITION_LOCAL_TIMEOUT,
+        )
+        raise RuntimeError("Локальная модель превысила таймаут") from exc
+
+    if process.returncode != 0:
+        logger.error(
+            "Локальная модель завершилась с ошибкой (%s): %s",
+            process.returncode,
+            stderr.decode("utf-8", errors="ignore"),
+        )
+        raise RuntimeError("Не удалось выполнить локальное распознавание")
+
+    stdout_text = stdout.decode("utf-8").strip()
+    if not stdout_text:
+        raise RuntimeError("Локальная модель вернула пустой ответ")
+
+    try:
+        payload = json.loads(stdout_text)
+    except json.JSONDecodeError as exc:
+        logger.error("Локальная модель вернула невалидный JSON: %s", stdout_text)
+        raise RuntimeError("Локальная модель вернула невалидный JSON") from exc
+
+    result = _map_payload_to_result(payload)
+
+    if (
+        result.confidence
+        and result.confidence < settings.RECOGNITION_LOCAL_CONFIDENCE_THRESHOLD
+    ):
+        logger.warning(
+            "Распознавание ниже порога доверия (%.2f < %.2f)",
+            result.confidence,
+            settings.RECOGNITION_LOCAL_CONFIDENCE_THRESHOLD,
+        )
+
+    return result
+
+
+def _map_payload_to_result(payload: dict) -> RecognitionResult:
+    """Преобразует JSON, полученный от локальной модели, в RecognitionResult."""
+    return RecognitionResult(
+        category=payload.get("category"),
+        name=payload.get("name"),
+        brand=payload.get("brand"),
+        material=payload.get("material"),
+        pattern=payload.get("pattern"),
+        dominant_color=payload.get("dominant_color"),
+        color_palette=payload.get("color_palette") or [],
+        season=payload.get("season") or [],
+        occasion=payload.get("occasion") or [],
+        confidence=float(payload.get("confidence") or 0.0),
     )
 
 

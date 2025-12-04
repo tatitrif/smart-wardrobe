@@ -54,6 +54,21 @@ class Settings(BaseSettings):
         "image/webp",
     ]
 
+    # Настройки распознавания одежды
+    RECOGNITION_ENABLED: bool = True
+    RECOGNITION_SERVICE: Literal[
+        "mock",
+        "local",
+        "google_vision",
+        "aws_rekognition",
+        "custom",
+    ] = "mock"
+    RECOGNITION_API_KEY: str | None = None
+    RECOGNITION_API_URL: str | None = None
+    RECOGNITION_LOCAL_COMMAND: str | None = None
+    RECOGNITION_LOCAL_TIMEOUT: int = 60  # секунды
+    RECOGNITION_LOCAL_CONFIDENCE_THRESHOLD: float = 0.4
+
     @property
     def DATABASE_URL(self) -> AnyUrl:
         """Формирует URL подключения к базе данных в зависимости от типа БД."""

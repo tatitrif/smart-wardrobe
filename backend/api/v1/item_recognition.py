@@ -1,4 +1,4 @@
-"""Маршруты API для управления item."""
+"""Маршруты API для управления распознавание."""
 
 from pathlib import Path
 from typing import Annotated
@@ -19,24 +19,22 @@ from .helpers.recognition import recognize_clothing_from_multiple_images
 from .helpers.upload import handle_file_upload
 
 logger = setup_logger(__name__)
-router = APIRouter(prefix="/recognize", tags=["recognize"])
+router = APIRouter(prefix="/items", tags=["items, recognize"])
 
 
 @router.post(
-    "/",
+    "/recognize",
     response_model=RecognizeAndCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Распознать и создать предмет гардероба из фотографий",
 )
 async def recognize_and_create_item(
-    images: Annotated[list[UploadFile], File(media_type="image/*")],
+    images: Annotated[
+        list[UploadFile], File(description="До 10 изображений одного предмета")
+    ],
     db: AsyncSession = Depends(get_db),
 ) -> RecognizeAndCreateResponse:
-    """Загружает несколько фотографий, распознает одежду и создает предмет гардероба.
-
-    Принимает от 1 до 10 изображений одного предмета одежды с разных ракурсов.
-    Автоматически распознает характеристики одежды и создает запись в базе данных.
-    """
+    """Загружает несколько фотографий, распознает одежду и создает предмет гардероба."""
     if not settings.RECOGNITION_ENABLED:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -55,12 +53,13 @@ async def recognize_and_create_item(
             detail="Максимальное количество изображений: 10",
         )
 
-    # Загружаем все изображения
-    uploaded_files = []
-    uploaded_paths = []
+    # Загружаем все  изображения
+    uploaded_files: list[str] = []
+    uploaded_paths: list[Path] = []
+
     try:
+        # Шаг 1. Загрузка изображений
         for idx, image_file in enumerate(images):
-            # Проверка типа файла
             if not image_file.content_type or not image_file.content_type.startswith(
                 "image/"
             ):
@@ -76,12 +75,12 @@ async def recognize_and_create_item(
 
         logger.info(f"Загружено {len(uploaded_files)} изображений для распознавания")
 
-        # Распознаем одежду на всех изображениях
+        # Шаг 2. Распознавание
         recognition_result = await recognize_clothing_from_multiple_images(
             uploaded_paths
         )
 
-        # Создаем Item на основе распознанных данных
+        # Шаг 3. Создание Item на основе распознанных данных
         item_data = ItemCreate(
             name=recognition_result.name or "Распознанный предмет",
             brand=recognition_result.brand,
@@ -100,7 +99,7 @@ async def recognize_and_create_item(
         # Создаем запись в БД
         item = await item_crud.create(db, obj_in=item_data)
 
-        # Привязываем загруженные изображения к предмету
+        # Шаг 4. Привязка изображений к предмету
         for idx, file_name in enumerate(uploaded_files):
             is_primary = idx == 0  # Первое изображение - основное
             # Можно определить угол по индексу или другим способом
@@ -130,7 +129,8 @@ async def recognize_and_create_item(
             f"({len(uploaded_files)} изображений)"
         )
 
-        # Формируем ответ
+        # Шаг 5. Ответ
+
         recognition_response = RecognitionResultResponse(
             category=recognition_result.category,
             name=recognition_result.name,
@@ -165,5 +165,5 @@ async def recognize_and_create_item(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при распознавании и создании предмета: {str(e)}",
+            detail="Ошибка при распознавании и создании предмета",
         ) from e
